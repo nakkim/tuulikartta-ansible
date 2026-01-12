@@ -1,0 +1,3 @@
+---
+users:
+  - { username: runner, uid: 4200, shell: /bin/bash, primary_group: runner, secondary_groups: "wheel", comment: 'Production Runner', primary_user: true }

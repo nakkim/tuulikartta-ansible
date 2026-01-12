@@ -1,0 +1,16 @@
+packages:
+  - { name: docker-ce}
+  - { name: docker-ce-cli}
+  - { name: containerd.io}
+  - { name: docker-buildx-plugin}
+  - { name: docker-compose-plugin}
+
+conflicting_packages:
+  - { name: docker}
+  - { name: docker-client}
+  - { name: docker-client-latest}
+  - { name: docker-common}
+  - { name: docker-latest}
+  - { name: docker-latest-logrotate}
+  - { name: docker-logrotate}
+  - { name: docker-engine}

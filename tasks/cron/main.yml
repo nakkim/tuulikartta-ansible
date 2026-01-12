@@ -1,0 +1,13 @@
+---
+
+- name: Include variables
+  include_vars:
+    file: docker-images.yml
+    name: docker_images
+
+- name: Run tuulikartta processor cron job every minute
+  ansible.builtin.cron:
+    name: "Tuulikartta data processor"
+    minute: "*"
+    job: "/usr/bin/docker run -v /data/processed:/data/processed {{ docker_images.tuulikartta_processor.image }}:{{ docker_images.tuulikartta_processor.tag }}"
+    user: runner

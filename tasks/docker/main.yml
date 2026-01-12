@@ -1,0 +1,7 @@
+---
+
+- name: Ensure docker is installed
+  include_tasks: install-docker.yml
+
+- name: Manage docker containers
+  include_tasks: docker-containers.yml

@@ -1,0 +1,17 @@
+---
+# tasks file for tuulikartta-server
+
+# - name: Update all packages to the latest version
+#   include_tasks: packages/main.yml
+
+- name: Add users and groups
+  include_tasks: users/main.yml
+
+- name: Directory setup
+  include_tasks: directories/main.yml
+
+- name: Docker operations
+  include_tasks: docker/main.yml
+
+- name: cronjobs setup
+  include_tasks: cron/main.yml

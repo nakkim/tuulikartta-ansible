@@ -1,0 +1,76 @@
+---
+
+- name: Include docker conflicting packages
+  include_vars:
+    file: docker-packages.yml
+    name: docker_conflicting_packages
+
+- name: Include docker packages
+  include_vars:
+    file: docker-packages.yml
+    name: docker_packages
+
+- name: Remove conflicting (unofficial) Docker packages
+  ansible.builtin.dnf:
+    name: "{{ item.name }}"
+    state: absent
+  with_items: "{{ docker_conflicting_packages.conflicting_packages }}"
+
+- name: Install dnf plugins (provides repo-management commands)
+  ansible.builtin.dnf:
+    name: dnf-plugins-core
+    state: present
+  # Docker docs use dnf-plugins-core + dnf config-manager.
+
+- name: Add Docker CE repo (no get_url)
+  ansible.builtin.command:
+    cmd: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+    creates: /etc/yum.repos.d/docker-ce.repo
+
+- name: Install Docker Engine + plugins
+  ansible.builtin.dnf:
+    name: "{{ item.name }}"
+    state: present
+    update_cache: true
+  with_items: "{{ docker_packages.packages }}"
+
+- name: Enable and start Docker
+  ansible.builtin.service:
+    name: docker
+    enabled: true
+    state: started
+  # systemctl enable --now docker
+
+- name: Add users to docker group (optional)
+  ansible.builtin.user:
+    name: "{{ item.username }}"
+    groups: docker
+    append: true
+  with_items: "{{ production_users.users }}"
+
+# Fix Not supported URL scheme http+docker
+- name: Ensure pip present
+  ansible.builtin.dnf:
+    name: python3-pip
+    state: present
+
+- name: Pin requests to avoid http+docker scheme error
+  ansible.builtin.pip:
+    name:
+      - "requests==2.31.0"
+    state: present
+
+- name: Ensure Docker SDK for Python present
+  ansible.builtin.pip:
+    name:
+      - "docker==7.1.0"
+    state: present
+
+# - name: Show Python + docker/requests versions Ansible is using
+#   ansible.builtin.command: python3 -c "import sys, docker, requests; print(sys.executable); print('docker', docker.__version__, 'requests', requests.__version__)"
+#   register: pydeps
+#   changed_when: false
+
+# # should be ¿ "docker 7.1.0 requests 2.31.0"
+# - ansible.builtin.debug:
+#     var: pydeps.stdout_lines

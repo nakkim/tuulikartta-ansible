@@ -1,0 +1,6 @@
+- name: Add required groups
+  group:
+    name: "{{ item.name }}"
+    gid: "{{ item.gid }}"
+    state: present
+  with_items: "{{ production_groups.groups }}"

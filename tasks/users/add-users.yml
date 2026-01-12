@@ -1,0 +1,16 @@
+---
+
+- name: Add required users
+  user:
+    append: yes
+    home: "/home/users/{{ item.username }}"
+    move_home: no
+    name: "{{ item.username }}"
+    comment: "{{ item.comment }}"
+    uid: "{{ item.uid }}"
+    group: "{{ item.primary_group }}"
+    groups: "{{ item.secondary_groups }}"
+    shell: "{{ item.shell }}"
+    state: present
+    create_home: yes
+  with_items: "{{ production_users.users }}"

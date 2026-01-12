@@ -1,0 +1,26 @@
+---
+
+- name: Include variables
+  include_vars:
+    file: docker-images.yml
+    name: docker_images
+
+- name: Pull tuulikartta-processor docker image
+  community.docker.docker_image:
+    name: "{{ docker_images.tuulikartta_processor.image }}"
+    tag: "{{ docker_images.tuulikartta_processor.tag }}"
+    source: pull
+    force_source: yes
+
+- name: Run tuulikartta-server docker container
+  community.docker.docker_container:
+    name: tuulikartta-server
+    image: "{{ docker_images.tuulikartta_server.image }}:{{ docker_images.tuulikartta_server.tag }}"
+    state: started
+    pull: true
+    restart_policy: always
+    ports:
+      - "80:80"
+    volumes:
+      - /data/processed:/var/www/html/data
+    detach: true

@@ -1,0 +1,9 @@
+---
+
+- name: Add data directory for tuulikartta
+  ansible.builtin.file:
+    path: /data/processed
+    state: directory
+    owner: runner
+    group: runner
+    mode: '0755'

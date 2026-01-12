@@ -1,0 +1,8 @@
+---
+
+- hosts: tuulikartta_servers
+  gather_facts: true
+  tasks:
+    - name: Install tuulikartta server
+      include_tasks: tasks/main.yml
+  serial: 1

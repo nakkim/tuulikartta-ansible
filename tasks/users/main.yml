@@ -1,0 +1,17 @@
+---
+
+- name: Include users
+  include_vars:
+    file: users.yml
+    name: production_users
+
+- name: Include groups
+  include_vars:
+    file: groups.yml
+    name: production_groups
+
+- name: Add required groups
+  include_tasks: add-required-groups.yml
+
+- name: Add required users
+  include_tasks: add-users.yml
