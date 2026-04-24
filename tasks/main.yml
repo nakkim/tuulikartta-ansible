@@ -15,3 +15,9 @@
 
 - name: cronjobs setup
   include_tasks: cron/main.yml
+
+- name: System settings
+  include_tasks: system/main.yml
+
+# - name: Install certbot
+#   include_tasks: certbot/main.yml

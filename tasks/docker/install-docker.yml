@@ -49,9 +49,11 @@
   with_items: "{{ production_users.users }}"
 
 # Fix Not supported URL scheme http+docker
-- name: Ensure pip present
+- name: Ensure pip and setuptools present (via dnf to avoid pkg_resources bootstrap issue)
   ansible.builtin.dnf:
-    name: python3-pip
+    name:
+      - python3-pip
+      - python3-setuptools
     state: present
 
 - name: Pin requests to avoid http+docker scheme error

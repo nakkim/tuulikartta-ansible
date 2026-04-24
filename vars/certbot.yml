@@ -1,0 +1,9 @@
+domain_name: tuulikartta.info
+domain_aliases:
+  - "www.{{ domain_name }}"
+all_domains: "{{ [domain_name] + domain_aliases }}"
+certbot_email: contact@tuulikartta.info
+letsencrypt_dir: /etc/letsencrypt
+letsencrypt_live_dir: "/etc/letsencrypt/live/{{ domain_name }}"
+renew_cron_minute: "21"
+renew_cron_hour: "3"

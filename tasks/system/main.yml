@@ -1,0 +1,23 @@
+---
+
+- name: Stop and disable unnecessary services if they exist
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop:   
+    - rpcbind
+    - rpcbind.socket
+    - nfs-server
+  when: ansible_facts.services[item] is defined
+
+- name: Remove unit files
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.service"
+    state: absent
+  notify: Reload systemd
+  loop:
+    - rpcbind
+    - rpcbind.socket
+    - nfs-server
+  when: ansible_facts.services[item] is defined

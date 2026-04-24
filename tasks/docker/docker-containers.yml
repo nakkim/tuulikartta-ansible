@@ -5,6 +5,10 @@
     file: docker-images.yml
     name: docker_images
 
+- name: Include certbot variables
+  include_vars:
+    file: certbot.yml
+
 - name: Pull tuulikartta-processor docker image
   community.docker.docker_image:
     name: "{{ docker_images.tuulikartta_processor.image }}"
@@ -20,7 +24,8 @@
     pull: true
     restart_policy: always
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
     volumes:
       - /data/processed:/var/www/html/data
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     detach: true

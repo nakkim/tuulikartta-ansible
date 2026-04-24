@@ -1,148 +1,169 @@
 Tuulikartta Server
 ==================
 
-An Ansible role for deploying and managing the Tuulikartta weather observation application server infrastructure. This role sets up Docker, manages users and groups, deploys Docker containers for the Tuulikartta server and processor, and configures automated data processing via cron jobs.
+An Ansible role for deploying and managing the Tuulikartta weather observation application server. It provisions a CentOS 10 host with Docker, deploys the application container, installs Nginx as an HTTPS reverse proxy, obtains a Let's Encrypt TLS certificate via Certbot, and sets up automated wind-data processing via cron.
 
 Requirements
 ------------
 
-- Ansible 2.1 or higher
-- Target system: CenTOS 10 or compatible
+- Ansible 2.10 or higher
+- Target system: CentOS 10 (or compatible RHEL-based distro with `dnf`)
 - Python 3 on the target host
+- SSH access as `root` (or a user with `become` privileges)
+- The domain name(s) in `vars/certbot.yml` must resolve to the server's public IP **before** running the play (required for Let's Encrypt certificate issuance)
 - Ansible collections:
-  - `community.docker` (for Docker container management)
 
-You can install required collections with:
 ```bash
 ansible-galaxy collection install community.docker
 ```
 
-Role Variables
---------------
+Architecture
+------------
 
-### Docker Images (vars/docker-images.yml)
-
-The Docker images and their versions are defined in `vars/docker-images.yml`:
-
-```yaml
-tuulikartta_processor:
-  image: "docker.io/nakkim/tuulikartta-processor"
-  tag: "v1.0.0"
-
-tuulikartta_server:
-  image: "docker.io/nakkim/tuulikartta-server"
-  tag: "v1.0.2"
+```
+Internet
+  │
+  ├── :80  ──► Nginx (host)  ──► redirect to HTTPS
+  └── :443 ──► Nginx (host)  ──► TLS termination
+                                   │
+                              proxy_pass http://127.0.0.1:8080
+                                   │
+                         tuulikartta-server container
+                         (binds 127.0.0.1:8080, serves /var/www/html/data)
 ```
 
-### Users and Groups (vars/)
-
-Users are defined in `vars/users.yml`:
-- **runner**: Primary user for running the Tuulikartta services (UID: 4200)
-
-Groups are defined in `vars/groups.yml`:
-- **runner**: Primary group for the runner user (GID: 3600)
-
-### Defaults (defaults/main.yml)
-
-Currently, there are no default variables set. All configuration is managed through the vars files.
+- **Nginx** runs on the host, owns ports 80 and 443, terminates TLS, and reverse-proxies to the app container.
+- **tuulikartta-server** Docker container serves the wind-data web application on `127.0.0.1:8080`.
+- **tuulikartta-processor** Docker container runs every minute via cron (as the `runner` user), fetches and processes weather observation data, and writes results to `/data/processed`.
+- **Certbot** (`python3-certbot-nginx` plugin) obtains and auto-renews a Let's Encrypt certificate. Renewal runs via cron at `03:21` daily.
 
 What This Role Does
 -------------------
 
-1. **User Management**: Creates the `runner` user and required groups with specific UIDs/GIDs
-2. **Directory Setup**: Creates necessary directories for data storage (`/data/processed`)
-3. **Docker Installation**: Installs and configures Docker on the target system
-4. **Container Deployment**:
-   - Pulls the tuulikartta-processor Docker image
-   - Deploys and runs the tuulikartta-server container on port 80
-   - Mounts `/data/processed` for serving processed wind data
-5. **Cron Jobs**: Sets up automated data processing job that runs every minute
+1. **User & group management** — creates the `runner` user (UID 4200 / GID 3600) used for cron jobs
+2. **Directory setup** — creates `/data/processed` for processed wind data
+3. **Docker installation** — installs Docker CE, the Compose plugin, and the Python Docker SDK
+4. **Container deployment** — pulls and starts `tuulikartta-server` (bound to `127.0.0.1:8080`) with `/data/processed` and `/etc/letsencrypt` mounted
+5. **Cron job** — runs `tuulikartta-processor` every minute as `runner`
+6. **System hardening** — disables and removes unnecessary services (`rpcbind`, `nfs-server`)
+7. **Nginx + TLS** — installs Nginx, deploys the reverse-proxy vhost, obtains a Let's Encrypt cert via `certbot --nginx`, and installs a daily renewal cron job
 
-Dependencies
-------------
-
-None. This is a standalone role.
-
-Example Playbook
-----------------
-
-### Basic Usage
-
-```yaml
----
-- hosts: tuulikartta_servers
-  gather_facts: true
-  tasks:
-    - name: Install tuulikartta server
-      include_tasks: tasks/main.yml
-  serial: 1
-```
-
-### Using as a Role
-
-```yaml
----
-- hosts: tuulikartta_servers
-  become: yes
-  roles:
-    - tuulikartta-server
-```
-
-### Running the Playbook
-
-```bash
-ansible-playbook \
-  --private-key=/path/to/private/key \
-  --inventory=inventories/production/hosts.yml \
-  --user=root \
-  tuulikartta-server.yml
-```
-
-Inventory Setup
+Role Variables
 --------------
 
-Configure your target servers in `inventories/production/hosts.yml`:
+### `vars/certbot.yml` — domain and TLS settings
+
+| Variable | Default | Description |
+|---|---|---|
+| `domain_name` | `test-nakkim.dy.fi` | Primary domain for the certificate and Nginx vhost |
+| `domain_aliases` | `[www.test-nakkim.dy.fi]` | Additional SANs added to the certificate |
+| `all_domains` | derived | Combined list of `domain_name` + `domain_aliases` |
+| `certbot_email` | `you@example.com` | Email address for Let's Encrypt account / expiry notices |
+| `letsencrypt_dir` | `/etc/letsencrypt` | Let's Encrypt base directory |
+| `letsencrypt_live_dir` | `/etc/letsencrypt/live/{{ domain_name }}` | Path to the live certificate files |
+| `renew_cron_minute` | `21` | Minute field for the renewal cron job |
+| `renew_cron_hour` | `3` | Hour field for the renewal cron job |
+
+### `vars/docker-images.yml` — container image versions
+
+| Variable | Value |
+|---|---|
+| `tuulikartta_server.image` | `docker.io/nakkim/tuulikartta-server` |
+| `tuulikartta_server.tag` | `v1.0.2` |
+| `tuulikartta_processor.image` | `docker.io/nakkim/tuulikartta-processor` |
+| `tuulikartta_processor.tag` | `v1.0.0` |
+
+### `vars/users.yml` / `vars/groups.yml`
+
+- **runner** user: UID 4200, primary group `runner` (GID 3600), secondary group `wheel`
+
+Pre-flight Checklist
+--------------------
+
+1. Point your domain's A record to the server IP.
+2. Edit `vars/certbot.yml` — set `domain_name`, `domain_aliases`, and `certbot_email`.
+3. Edit `vars/docker-images.yml` — pin the image tags you want to deploy.
+4. Edit `inventories/production/hosts.yml` — add your server's IP or hostname.
+
+Inventory Setup
+---------------
 
 ```yaml
+# inventories/production/hosts.yml
 ---
 all:
   children:
     tuulikartta_servers:
       hosts:
-        your.server.ip.address:
+        203.0.113.10:   # replace with your server IP
 ```
 
-Architecture
------------
+Running the Playbook
+--------------------
 
-- **Tuulikartta Server**: Web server container serving web application on port 80
-- **Tuulikartta Processor**: Processing container running a python script run via cron every minute to process weather observation data
-- **Data Directory**: `/data/processed` stores the processed weather observation data files
+```bash
+ansible-playbook \
+  --private-key ~/.ssh/your_key \
+  --inventory inventories/production/hosts.yml \
+  --user root \
+  tuulikartta-server.yml
+```
 
-The processor container runs periodically to fetch and process new weather observation data, storing results in `/data/processed`. The server container continuously serves this data via HTTP.
+To run only a specific part of the role use tags or limit to specific tasks. To do a dry-run first:
+
+```bash
+ansible-playbook \
+  --private-key ~/.ssh/your_key \
+  --inventory inventories/production/hosts.yml \
+  --user root \
+  --check \
+  tuulikartta-server.yml
+```
 
 Files Structure
---------------
+---------------
 
 ```
 .
-├── defaults/           # Default variables (currently empty)
-├── files/             # Static files
-├── handlers/          # Ansible handlers
-├── inventories/       # Inventory files
+├── defaults/
+│   └── main.yml                    # (empty — all config lives in vars/)
+├── handlers/
+│   └── main.yml                    # reload nginx, reload systemd
+├── inventories/
 │   └── production/
-├── meta/              # Role metadata
-├── tasks/             # Task definitions
-│   ├── cron/         # Cron job setup
-│   ├── directories/  # Directory creation
-│   ├── docker/       # Docker installation and container management
-│   ├── packages/     # Package management
-│   └── users/        # User and group management
-├── templates/         # Jinja2 templates
-├── tests/            # Test playbooks
-└── vars/             # Variable definitions
-
+│       └── hosts.yml               # target server(s)
+├── tasks/
+│   ├── main.yml                    # top-level task orchestration
+│   ├── certbot/
+│   │   └── main.yml                # nginx install, cert issuance, renewal cron
+│   ├── cron/
+│   │   └── main.yml                # tuulikartta-processor cron job
+│   ├── directories/
+│   │   └── main.yml                # /data/processed creation
+│   ├── docker/
+│   │   ├── main.yml
+│   │   ├── install-docker.yml      # Docker CE + SDK install
+│   │   └── docker-containers.yml   # pull & run tuulikartta-server
+│   ├── system/
+│   │   └── main.yml                # disable unused services
+│   └── users/
+│       ├── main.yml
+│       ├── add-required-groups.yml
+│       └── add-users.yml
+├── templates/
+│   └── nginx-tuulikartta.conf.j2   # Nginx HTTP→HTTPS redirect + reverse proxy vhost
+└── vars/
+    ├── certbot.yml                 # domain, TLS, and renewal settings
+    ├── docker-images.yml           # image names and tags
+    ├── docker-packages.yml         # Docker CE package list
+    ├── groups.yml                  # system groups
+    └── users.yml                   # system users
 ```
+
+Dependencies
+------------
+
+None. This is a standalone role.
 
 License
 -------
