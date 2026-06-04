@@ -1,8 +1,8 @@
 ---
 # tasks file for tuulikartta-server
 
-# - name: Update all packages to the latest version
-#   include_tasks: packages/main.yml
+- name: Update all packages to the latest version
+  include_tasks: packages/main.yml
 
 - name: Add users and groups
   include_tasks: users/main.yml
@@ -19,5 +19,5 @@
 - name: System settings
   include_tasks: system/main.yml
 
-# - name: Install certbot
-#   include_tasks: certbot/main.yml
+- name: Install certbot
+  include_tasks: certbot/main.yml

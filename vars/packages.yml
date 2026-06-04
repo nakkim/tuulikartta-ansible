@@ -1,0 +1,4 @@
+packages:
+  - { name: nginx }
+  - { name: certbot }
+  - { name: python3-certbot-nginx }

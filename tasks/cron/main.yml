@@ -9,6 +9,6 @@
   ansible.builtin.cron:
     name: "Tuulikartta data processor"
     minute: "*"
-    job: "/usr/bin/docker rm tuulikartta-processor && /usr/bin/docker run --name tuulikartta-processor -v /data/processed:/data/processed {{ docker_images.tuulikartta_processor.image }}:{{ docker_images.tuulikartta_processor.tag }}"
+    job: "/usr/bin/docker rm -f tuulikartta-processor 2>/dev/null; /usr/bin/docker run --name tuulikartta-processor -v /data/processed:/data/processed {{ docker_images.tuulikartta_processor.image }}:{{ docker_images.tuulikartta_processor.tag }}"
     user: runner
     cron_file: tuulikartta-processor

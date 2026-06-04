@@ -1,0 +1,11 @@
+---
+
+- name: Add docker daemon settings
+  copy:
+    src: docker-daemon.json
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart docker

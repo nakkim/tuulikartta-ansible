@@ -1,7 +1,25 @@
 ---
 
-- name: Run dnf update to ensure all packages are up to date
+- name: Include packages
+  include_vars:
+    file: packages.yml
+    name: packages
+
+# - name: Run dnf update to ensure all packages are up to date
+#   ansible.builtin.dnf:
+#     name: "*"
+#     state: latest
+#     update_cache: true
+
+- name: Install EPEL repository
   ansible.builtin.dnf:
-    name: "*"
-    state: latest
+    name: epel-release
+    state: present
+
+- name: Install all required packages
+  ansible.builtin.dnf:
+    name: "{{ item.name }}"
+    state: present
     update_cache: true
+  with_items: "{{ packages.packages }}"
+  

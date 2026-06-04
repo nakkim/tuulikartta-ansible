@@ -5,3 +5,6 @@
 
 - name: Manage docker containers
   include_tasks: docker-containers.yml
+
+- name: Add docker daemon settings
+  include_tasks: daemon-settings.yml

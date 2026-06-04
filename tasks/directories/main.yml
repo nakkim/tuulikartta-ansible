@@ -7,3 +7,11 @@
     owner: runner
     group: runner
     mode: '0755'
+
+- name: Add logs directory nginx
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d
+    state: directory
+    owner: runner
+    group: runner
+    mode: '0755'
