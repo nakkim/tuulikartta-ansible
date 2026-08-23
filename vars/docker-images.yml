@@ -1,8 +1,8 @@
 ---
 tuulikartta_processor:
   image: "docker.io/nakkim/tuulikartta-processor"
-  tag: "v1.0.0"
+  tag: "v1.0.1"
 
 tuulikartta_server:
   image: "docker.io/nakkim/tuulikartta-server"
-  tag: "v1.0.7"
+  tag: "v1.0.8"
