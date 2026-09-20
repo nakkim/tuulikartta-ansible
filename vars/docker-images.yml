@@ -5,4 +5,4 @@ tuulikartta_processor:
 
 tuulikartta_server:
   image: "docker.io/nakkim/tuulikartta-server"
-  tag: "v1.0.8"
+  tag: "v1.0.10"
