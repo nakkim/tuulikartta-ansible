@@ -1,13 +1,13 @@
 ---
-
 - name: Include variables
   include_vars:
     file: docker-images.yml
     name: docker_images
 
-- name: Include certbot variables
-  include_vars:
-    file: certbot.yml
+## TODO remove as deprecated - SSL is now handled by Hetzner
+# - name: Include certbot variables
+#   include_vars:
+#     file: certbot.yml
 
 - name: Pull tuulikartta-processor docker image
   community.docker.docker_image:

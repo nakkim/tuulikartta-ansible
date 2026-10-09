@@ -18,6 +18,6 @@
 
 - name: System settings
   include_tasks: system/main.yml
-
-- name: Install certbot
-  include_tasks: certbot/main.yml
+## TODO remove as deprecated - SSL is now handled by Hetzner
+# - name: Install certbot
+#   include_tasks: certbot/main.yml

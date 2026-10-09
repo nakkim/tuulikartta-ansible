@@ -1,8 +1,9 @@
 ---
+## TODO remove as deprecated - SSL is now handled by Hetzner
 
-- name: Include certbot variables
-  include_vars:
-    file: certbot.yml
+# - name: Include certbot variables
+#   include_vars:
+#     file: certbot.yml
 
 # - name: Ensure /var/www/certbot exists (webroot for ACME challenges)
 #   ansible.builtin.file:
@@ -10,22 +11,22 @@
 #     state: directory
 #     mode: "0755"
 
-- name: Deploy HTTP-only nginx config (bootstrap, no cert required)
-  ansible.builtin.template:
-    src: templates/nginx-tuulikartta-http.conf.j2
-    dest: /etc/nginx/conf.d/tuulikartta.conf
-    mode: "0644"
+# - name: Deploy HTTP-only nginx config (bootstrap, no cert required)
+#   ansible.builtin.template:
+#     src: templates/nginx-tuulikartta-http.conf.j2
+#     dest: /etc/nginx/conf.d/tuulikartta.conf
+#     mode: "0644"
 
-- name: Remove default nginx server block if present
-  ansible.builtin.file:
-    path: /etc/nginx/conf.d/default.conf
-    state: absent
+# - name: Remove default nginx server block if present
+#   ansible.builtin.file:
+#     path: /etc/nginx/conf.d/default.conf
+#     state: absent
 
-- name: Enable and start nginx (HTTP only)
-  ansible.builtin.systemd:
-    name: nginx
-    enabled: true
-    state: started
+# - name: Enable and start nginx (HTTP only)
+#   ansible.builtin.systemd:
+#     name: nginx
+#     enabled: true
+#     state: started
 
 # - name: Check whether certificate already exists
 #   ansible.builtin.stat:
@@ -50,11 +51,10 @@
 #     dest: /etc/nginx/conf.d/tuulikartta.conf
 #     mode: "0644"
 
-- name: Reload nginx to apply HTTPS config
-  ansible.builtin.systemd:
-    name: nginx
-    state: reloaded
-
+# - name: Reload nginx to apply HTTPS config
+#   ansible.builtin.systemd:
+#     name: nginx
+#     state: reloaded
 # - name: Install renewal cron job (certbot renew handles nginx gracefully)
 #   ansible.builtin.cron:
 #     name: "Renew Let's Encrypt cert for {{ domain_name }}"
@@ -63,4 +63,3 @@
 #     user: root
 #     job: "certbot renew --quiet && systemctl reload nginx"
 #     cron_file: certbot-renew
-    
