@@ -1,0 +1,124 @@
+---
+# Manage rows in the app's notifications table on the main server.
+#
+# Insert rows from a data file:
+#   ansible-playbook -i inventories/production/hosts.yml notifications.yml \
+#     -e @notification-data/example.yml
+#
+# Remove all rows (asks for confirmation):
+#   ansible-playbook -i inventories/production/hosts.yml notifications.yml \
+#     -e notifications_clear=true
+#
+# Both can be combined to replace all rows. Clearing always runs first.
+# Add -e notifications_clear_confirmed=true to skip the confirmation prompt.
+
+- hosts: tuulikartta_main_server
+  gather_facts: false
+  vars:
+    notifications: []
+    notifications_clear: false
+    notifications_clear_confirmed: false
+  tasks:
+    - name: Check that there is something to do
+      ansible.builtin.assert:
+        that:
+          - notifications | length > 0 or notifications_clear | bool
+        fail_msg: "Nothing to do. Pass a data file (-e @notification-data/example.yml) or -e notifications_clear=true"
+
+    - name: Check notification data
+      ansible.builtin.assert:
+        that:
+          - item.text_fi is defined and item.text_fi | length > 0
+          - item.text_en is defined and item.text_en | length > 0
+          - item.type | default('notification') in ['notification', 'alert']
+        fail_msg: "Each notification needs text_fi and text_en, and type must be 'notification' or 'alert'"
+        quiet: true
+      loop: "{{ notifications }}"
+      loop_control:
+        label: "{{ item.text_en | default('(missing text_en)') }}"
+
+    - name: Confirm removal of all notifications
+      ansible.builtin.pause:
+        prompt: "This deletes ALL rows from the notifications table on {{ inventory_hostname }}. Type 'yes' to continue"
+      register: clear_confirmation
+      when:
+        - notifications_clear | bool
+        - not notifications_clear_confirmed | bool
+
+    - name: Stop if removal was not confirmed
+      ansible.builtin.fail:
+        msg: "Removal not confirmed, nothing changed"
+      when:
+        - notifications_clear | bool
+        - not notifications_clear_confirmed | bool
+        - clear_confirmation.user_input | default('') != 'yes'
+
+    - name: Remove all notifications
+      community.docker.docker_container_exec:
+        container: postgres
+        argv: [psql, -v, ON_ERROR_STOP=1, -U, "{{ postgres_user }}", -d, "{{ postgres_db }}"]
+        stdin: "TRUNCATE notifications RESTART IDENTITY;"
+      when: notifications_clear | bool
+
+    # Values are passed as psql variables and quoted by psql (:'name'),
+    # so text containing quotes or SQL is stored as-is.
+    - name: Insert notifications
+      community.docker.docker_container_exec:
+        container: postgres
+        argv:
+          - psql
+          - -v
+          - ON_ERROR_STOP=1
+          - -U
+          - "{{ postgres_user }}"
+          - -d
+          - "{{ postgres_db }}"
+          - -v
+          - "text_fi={{ item.text_fi }}"
+          - -v
+          - "text_en={{ item.text_en }}"
+          - -v
+          - "type={{ item.type | default('notification') }}"
+          - -v
+          - "active={{ item.active | default(true) | bool | lower }}"
+          - -v
+          - "link={{ item.link | default('') }}"
+          - -v
+          - "priority={{ item.priority | default(0) | int }}"
+          - -v
+          - "starts_at={{ item.starts_at | default('') }}"
+          - -v
+          - "expires_at={{ item.expires_at | default('') }}"
+        stdin: |
+          INSERT INTO notifications (text_fi, text_en, type, active, link, priority, starts_at, expires_at)
+          VALUES (
+            :'text_fi',
+            :'text_en',
+            :'type'::"NotificationType",
+            :'active'::boolean,
+            NULLIF(:'link', ''),
+            :'priority'::integer,
+            NULLIF(:'starts_at', '')::timestamptz,
+            NULLIF(:'expires_at', '')::timestamptz
+          );
+      loop: "{{ notifications }}"
+      loop_control:
+        label: "{{ item.text_en }}"
+
+    - name: List notifications
+      community.docker.docker_container_exec:
+        container: postgres
+        argv:
+          - psql
+          - -U
+          - "{{ postgres_user }}"
+          - -d
+          - "{{ postgres_db }}"
+          - -c
+          - SELECT id, type, active, priority, starts_at, expires_at, left(text_en, 50) AS text_en FROM notifications ORDER BY id
+      register: notification_list
+      changed_when: false
+
+    - name: Show notifications
+      ansible.builtin.debug:
+        msg: "{{ notification_list.stdout_lines }}"

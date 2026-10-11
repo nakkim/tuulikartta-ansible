@@ -16,6 +16,11 @@
     source: pull
     force_source: yes
 
+# Shared network so containers reach each other by name (e.g. postgres:5432)
+- name: Create tuulikartta docker network
+  community.docker.docker_network:
+    name: tuulikartta
+
 - name: Run tuulikartta-server docker container
   community.docker.docker_container:
     name: tuulikartta-server
@@ -23,9 +28,14 @@
     state: started
     pull: true
     restart_policy: always
+    # database_url is defined only for hosts that can reach postgres (see group_vars)
+    env: "{{ {'DATABASE_URL': database_url} if database_url is defined else {} }}"
+    networks:
+      - name: tuulikartta
     ports:
       - "127.0.0.1:8080:80"
     volumes:
       - /data/processed:/var/www/html/data
       - /etc/letsencrypt:/etc/letsencrypt:ro
     detach: true
+  no_log: "{{ hide_secrets | default(true) }}"

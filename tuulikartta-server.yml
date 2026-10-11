@@ -2,13 +2,15 @@
 
 - hosts: tuulikartta_servers
   gather_facts: true
-  tasks:
-    - name: Install tuulikartta server
-      include_tasks: tasks/main.yml
   serial: 1
+  roles:
+    - tuulikartta_server
+
 # Shared services: run only on the main server
 - hosts: tuulikartta_main_server
   gather_facts: true
   tasks:
     - name: Install postgres
-      include_tasks: tasks/postgres/main.yml
+      ansible.builtin.include_role:
+        name: tuulikartta_server
+        tasks_from: postgres/main.yml

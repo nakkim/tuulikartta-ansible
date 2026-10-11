@@ -1,0 +1,26 @@
+---
+# Example data for notifications.yml. Copy this file, edit the rows, then run:
+#   ansible-playbook -i inventories/production/hosts.yml notifications.yml \
+#     -e @notification-data/<your-file>.yml
+#
+# Fields:
+#   text_fi, text_en  required, message text per language
+#   type              optional, "notification" (default) or "alert"
+#   active            optional, true (default) or false
+#   link              optional, "read more" URL
+#   priority          optional, higher is shown first, 0 (default) keeps default ordering
+#   starts_at         optional, timestamp with time zone, empty shows immediately
+#   expires_at        optional, timestamp with time zone, empty never expires
+notifications:
+  - text_fi: "Piirtoasetuksista voi nyt valita tuulihavaintojen esitysmuodoksi tuulinuolet. Lisäksi kartalle voi nyt lisätä tuulen konvergenssi- ja divergenssialueet."
+    text_en: "You can now choose wind arrows as the display mode for wind observations in the drawing settings. Additionally, you can now add wind convergence and divergence areas to the map."
+    type: notification
+    link: "https://tuulikartta.info/tietoa-sivustosta/"
+    expires_at: "2026-10-18 00:00:00+02"
+
+  # - text_fi: "Tutkakuvien palvelussa saattaa esiintyä tilapäisiä katkoja huoltotöiden vuoksi."
+  #   text_en: "The radar imagery service may experience temporary outages due to maintenance."
+  #   type: alert
+  #   priority: 10
+  #   starts_at: "2026-10-12 08:00:00+03"
+  #   expires_at: "2026-10-14 18:00:00+03"

@@ -8,7 +8,7 @@ An Ansible role for deploying and managing the Tuulikartta weather observation a
 - Target system: CentOS 10 (or compatible RHEL-based distro with `dnf`)
 - Python 3 on the target host
 - SSH access as `root` (or a user with `become` privileges)
-- The domain name(s) in `vars/certbot.yml` must resolve to the server's public IP **before** running the play (required for Let's Encrypt certificate issuance)
+- The domain name(s) in `roles/tuulikartta_server/vars/certbot.yml` must resolve to the server's public IP **before** running the play (required for Let's Encrypt certificate issuance)
 - Ansible collections:
 
 ```bash
@@ -46,7 +46,7 @@ Internet
 
 ## Role Variables
 
-### `vars/certbot.yml` — domain and TLS settings
+### `roles/tuulikartta_server/vars/certbot.yml` — domain and TLS settings
 
 | Variable               | Default                                   | Description                                              |
 | ---------------------- | ----------------------------------------- | -------------------------------------------------------- |
@@ -59,7 +59,7 @@ Internet
 | `renew_cron_minute`    | `21`                                      | Minute field for the renewal cron job                    |
 | `renew_cron_hour`      | `3`                                       | Hour field for the renewal cron job                      |
 
-### `vars/docker-images.yml` — container image versions
+### `roles/tuulikartta_server/vars/docker-images.yml` — container image versions
 
 | Variable                      | Value                                    |
 | ----------------------------- | ---------------------------------------- |
@@ -68,15 +68,15 @@ Internet
 | `tuulikartta_processor.image` | `docker.io/nakkim/tuulikartta-processor` |
 | `tuulikartta_processor.tag`   | `v1.0.0`                                 |
 
-### `vars/users.yml` / `vars/groups.yml`
+### `roles/tuulikartta_server/vars/users.yml` / `roles/tuulikartta_server/vars/groups.yml`
 
 - **runner** user: UID 4200, primary group `runner` (GID 3600), secondary group `wheel`
 
 ## Pre-flight Checklist
 
 1. Point your domain's A record to the server IP.
-2. Edit `vars/certbot.yml` — set `domain_name`, `domain_aliases`, and `certbot_email`.
-3. Edit `vars/docker-images.yml` — pin the image tags you want to deploy.
+2. Edit `roles/tuulikartta_server/vars/certbot.yml` — set `domain_name`, `domain_aliases`, and `certbot_email`.
+3. Edit `roles/tuulikartta_server/vars/docker-images.yml` — pin the image tags you want to deploy.
 4. Edit `inventories/production/hosts.yml` — add your server's IP or hostname.
 
 ## Inventory Setup
@@ -118,48 +118,86 @@ ansible-playbook \
   tuulikartta-server.yml
 ```
 
+## Managing Notifications
+
+`notifications.yml` inserts rows into the app's `notifications` table on the main server. Copy `notification-data/data.yml`, edit the rows, then run:
+
+```bash
+ansible-playbook \
+  --private-key ~/.ssh/your_key \
+  --inventory inventories/production/hosts.yml \
+  --user root \
+  -e @notification-data/your-file.yml \
+  notifications.yml
+```
+
+To remove all rows, add `-e notifications_clear=true`. The playbook asks for confirmation; add `-e notifications_clear_confirmed=true` to skip it. Combined with a data file, clearing runs first, so the file replaces all rows.
+
 ## Files Structure
 
 ```
 .
-├── defaults/
-│   └── main.yml                    # (empty — all config lives in vars/)
-├── handlers/
-│   └── main.yml                    # reload nginx, reload systemd
+├── ansible.cfg
+├── tuulikartta-server.yml              # playbook: role on all servers, postgres on main server
+├── notifications.yml                   # playbook: insert or remove notification rows
+├── notification-data/
+│   └── data.yml                     # example notification rows
+├── group_vars/
+│   └── tuulikartta_main_server.yml     # postgres credentials (password vault-encrypted)
 ├── inventories/
 │   └── production/
-│       └── hosts.yml               # target server(s)
-├── tasks/
-│   ├── main.yml                    # top-level task orchestration
-│   ├── certbot/
-│   │   └── main.yml                # nginx install, cert issuance, renewal cron
-│   ├── cron/
-│   │   └── main.yml                # tuulikartta-processor cron job
-│   ├── directories/
-│   │   └── main.yml                # /data/processed creation
-│   ├── docker/
-│   │   ├── main.yml
-│   │   ├── install-docker.yml      # Docker CE + SDK install
-│   │   └── docker-containers.yml   # pull & run tuulikartta-server
-│   ├── system/
-│   │   └── main.yml                # disable unused services
-│   └── users/
-│       ├── main.yml
-│       ├── add-required-groups.yml
-│       └── add-users.yml
-├── templates/
-│   └── nginx-tuulikartta.conf.j2   # Nginx HTTP→HTTPS redirect + reverse proxy vhost
-└── vars/
-    ├── certbot.yml                 # domain, TLS, and renewal settings
-    ├── docker-images.yml           # image names and tags
-    ├── docker-packages.yml         # Docker CE package list
-    ├── groups.yml                  # system groups
-    └── users.yml                   # system users
+│       └── hosts.yml                   # main and aux servers
+└── roles/
+    └── tuulikartta_server/
+        ├── defaults/
+        │   └── main.yml                # (empty — all config lives in vars/)
+        ├── files/
+        │   └── docker-daemon.json      # Docker daemon settings
+        ├── handlers/
+        │   └── main.yml                # reload nginx, reload systemd, restart docker
+        ├── meta/
+        │   └── main.yml
+        ├── tasks/
+        │   ├── main.yml                # top-level task orchestration
+        │   ├── certbot/
+        │   │   └── main.yml            # nginx install, cert issuance, renewal cron (deprecated)
+        │   ├── cron/
+        │   │   └── main.yml            # tuulikartta-processor cron job
+        │   ├── directories/
+        │   │   └── main.yml            # /data/processed creation
+        │   ├── docker/
+        │   │   ├── main.yml
+        │   │   ├── install-docker.yml  # Docker CE + SDK install
+        │   │   ├── daemon-settings.yml # Docker daemon config
+        │   │   └── docker-containers.yml # docker network, pull & run tuulikartta-server
+        │   ├── packages/
+        │   │   └── main.yml            # system packages
+        │   ├── postgres/
+        │   │   └── main.yml            # postgres container + prisma migrations (main server only)
+        │   ├── system/
+        │   │   └── main.yml            # disable unused services
+        │   └── users/
+        │       ├── main.yml
+        │       ├── add-required-groups.yml
+        │       └── add-users.yml
+        ├── templates/
+        │   ├── nginx-tuulikartta-http.conf.j2
+        │   └── nginx-tuulikartta.conf.j2   # Nginx HTTP→HTTPS redirect + reverse proxy vhost
+        ├── tests/
+        │   ├── inventory
+        │   └── test.yml
+        └── vars/
+            ├── certbot.yml             # domain, TLS, and renewal settings
+            ├── docker-images.yml       # image names and tags
+            ├── docker-packages.yml     # Docker CE package list
+            ├── groups.yml              # system groups
+            ├── packages.yml            # system packages
+            └── users.yml               # system users
 ```
 
 ## Dependencies
 
-None. This is a standalone role.
+None. The role has no dependencies on other roles.
 
 ## License
 

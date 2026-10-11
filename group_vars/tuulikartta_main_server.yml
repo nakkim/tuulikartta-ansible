@@ -12,3 +12,7 @@ postgres_password: !vault |
   36383839663565633066343935626538396234353938613164326639633866643766333232303463
   3331386330366565396436643530626663656133333165626231
 postgres_db: tuulikartta
+
+# Used by the app container and the migration container. Containers reach
+# postgres by name over the tuulikartta docker network.
+database_url: "postgresql://{{ postgres_user | urlencode }}:{{ postgres_password | string | urlencode | replace('/', '%2F') }}@postgres:5432/{{ postgres_db }}"
