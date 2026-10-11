@@ -1,10 +1,8 @@
-Tuulikartta Server
-==================
+# Tuulikartta Server
 
 An Ansible role for deploying and managing the Tuulikartta weather observation application server. It provisions a CentOS 10 host with Docker, deploys the application container, installs Nginx as an HTTPS reverse proxy, obtains a Let's Encrypt TLS certificate via Certbot, and sets up automated wind-data processing via cron.
 
-Requirements
-------------
+## Requirements
 
 - Ansible 2.10 or higher
 - Target system: CentOS 10 (or compatible RHEL-based distro with `dnf`)
@@ -17,8 +15,7 @@ Requirements
 ansible-galaxy collection install community.docker
 ```
 
-Architecture
-------------
+## Architecture
 
 ```
 Internet
@@ -37,8 +34,7 @@ Internet
 - **tuulikartta-processor** Docker container runs every minute via cron (as the `runner` user), fetches and processes weather observation data, and writes results to `/data/processed`.
 - **Certbot** (`python3-certbot-nginx` plugin) obtains and auto-renews a Let's Encrypt certificate. Renewal runs via cron at `03:21` daily.
 
-What This Role Does
--------------------
+## What This Role Does
 
 1. **User & group management** — creates the `runner` user (UID 4200 / GID 3600) used for cron jobs
 2. **Directory setup** — creates `/data/processed` for processed wind data
@@ -48,45 +44,42 @@ What This Role Does
 6. **System hardening** — disables and removes unnecessary services (`rpcbind`, `nfs-server`)
 7. **Nginx + TLS** — installs Nginx, deploys the reverse-proxy vhost, obtains a Let's Encrypt cert via `certbot --nginx`, and installs a daily renewal cron job
 
-Role Variables
---------------
+## Role Variables
 
 ### `vars/certbot.yml` — domain and TLS settings
 
-| Variable | Default | Description |
-|---|---|---|
-| `domain_name` | `test-nakkim.dy.fi` | Primary domain for the certificate and Nginx vhost |
-| `domain_aliases` | `[www.test-nakkim.dy.fi]` | Additional SANs added to the certificate |
-| `all_domains` | derived | Combined list of `domain_name` + `domain_aliases` |
-| `certbot_email` | `you@example.com` | Email address for Let's Encrypt account / expiry notices |
-| `letsencrypt_dir` | `/etc/letsencrypt` | Let's Encrypt base directory |
-| `letsencrypt_live_dir` | `/etc/letsencrypt/live/{{ domain_name }}` | Path to the live certificate files |
-| `renew_cron_minute` | `21` | Minute field for the renewal cron job |
-| `renew_cron_hour` | `3` | Hour field for the renewal cron job |
+| Variable               | Default                                   | Description                                              |
+| ---------------------- | ----------------------------------------- | -------------------------------------------------------- |
+| `domain_name`          | `test-nakkim.dy.fi`                       | Primary domain for the certificate and Nginx vhost       |
+| `domain_aliases`       | `[www.test-nakkim.dy.fi]`                 | Additional SANs added to the certificate                 |
+| `all_domains`          | derived                                   | Combined list of `domain_name` + `domain_aliases`        |
+| `certbot_email`        | `you@example.com`                         | Email address for Let's Encrypt account / expiry notices |
+| `letsencrypt_dir`      | `/etc/letsencrypt`                        | Let's Encrypt base directory                             |
+| `letsencrypt_live_dir` | `/etc/letsencrypt/live/{{ domain_name }}` | Path to the live certificate files                       |
+| `renew_cron_minute`    | `21`                                      | Minute field for the renewal cron job                    |
+| `renew_cron_hour`      | `3`                                       | Hour field for the renewal cron job                      |
 
 ### `vars/docker-images.yml` — container image versions
 
-| Variable | Value |
-|---|---|
-| `tuulikartta_server.image` | `docker.io/nakkim/tuulikartta-server` |
-| `tuulikartta_server.tag` | `v1.0.2` |
+| Variable                      | Value                                    |
+| ----------------------------- | ---------------------------------------- |
+| `tuulikartta_server.image`    | `docker.io/nakkim/tuulikartta-server`    |
+| `tuulikartta_server.tag`      | `v1.0.2`                                 |
 | `tuulikartta_processor.image` | `docker.io/nakkim/tuulikartta-processor` |
-| `tuulikartta_processor.tag` | `v1.0.0` |
+| `tuulikartta_processor.tag`   | `v1.0.0`                                 |
 
 ### `vars/users.yml` / `vars/groups.yml`
 
 - **runner** user: UID 4200, primary group `runner` (GID 3600), secondary group `wheel`
 
-Pre-flight Checklist
---------------------
+## Pre-flight Checklist
 
 1. Point your domain's A record to the server IP.
 2. Edit `vars/certbot.yml` — set `domain_name`, `domain_aliases`, and `certbot_email`.
 3. Edit `vars/docker-images.yml` — pin the image tags you want to deploy.
 4. Edit `inventories/production/hosts.yml` — add your server's IP or hostname.
 
-Inventory Setup
----------------
+## Inventory Setup
 
 ```yaml
 # inventories/production/hosts.yml
@@ -94,18 +87,23 @@ Inventory Setup
 all:
   children:
     tuulikartta_servers:
-      hosts:
-        203.0.113.10:   # replace with your server IP
+      children:
+        tuulikartta_main_server: # runs shared services (GeoServer, SmartMet Server, etc.)
+          hosts:
+            203.0.113.10: # replace with your server IP
+        tuulikartta_aux_servers: # use shared services from the main server
+          hosts:
+            # 203.0.113.11:
 ```
 
-Running the Playbook
---------------------
+## Running the Playbook
 
 ```bash
 ansible-playbook \
   --private-key ~/.ssh/your_key \
   --inventory inventories/production/hosts.yml \
   --user root \
+  --ask-vault-pass \
   tuulikartta-server.yml
 ```
 
@@ -120,8 +118,7 @@ ansible-playbook \
   tuulikartta-server.yml
 ```
 
-Files Structure
----------------
+## Files Structure
 
 ```
 .
@@ -160,17 +157,14 @@ Files Structure
     └── users.yml                   # system users
 ```
 
-Dependencies
-------------
+## Dependencies
 
 None. This is a standalone role.
 
-License
--------
+## License
 
 MIT
 
-Author Information
-------------------
+## Author Information
 
 Maintained as part of the Tuulikartta project.

@@ -6,3 +6,9 @@
     - name: Install tuulikartta server
       include_tasks: tasks/main.yml
   serial: 1
+# Shared services: run only on the main server
+- hosts: tuulikartta_main_server
+  gather_facts: true
+  tasks:
+    - name: Install postgres
+      include_tasks: tasks/postgres/main.yml

@@ -6,3 +6,7 @@ tuulikartta_processor:
 tuulikartta_server:
   image: "ghcr.io/nakkim/tuulikartta.info"
   tag: "1.0.15"
+
+postgres:
+  image: "docker.io/library/postgres"
+  tag: "16-alpine"

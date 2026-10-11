@@ -1,0 +1,37 @@
+---
+- name: Include docker image variables
+  include_vars:
+    file: docker-images.yml
+    name: docker_images
+
+- name: Check required postgres variables
+  ansible.builtin.assert:
+    that:
+      - postgres_user is defined
+      - postgres_password is defined
+      - postgres_db is defined
+      - "'CHANGE_ME' not in [postgres_user, postgres_password, postgres_db]"
+    fail_msg: "Set postgres_user, postgres_password and postgres_db in group_vars/tuulikartta_main_server.yml"
+
+- name: Create postgres data volume
+  community.docker.docker_volume:
+    name: postgres-data
+
+- name: Run postgres docker container
+  community.docker.docker_container:
+    name: postgres
+    image: "{{ docker_images.postgres.image }}:{{ docker_images.postgres.tag }}"
+    state: started
+    pull: true
+    restart_policy: unless-stopped
+    env:
+      POSTGRES_USER: "{{ postgres_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_password }}"
+      POSTGRES_DB: "{{ postgres_db }}"
+    # Published on localhost only, so host tools (e.g. `npx prisma migrate`) can reach it
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    detach: true
+  no_log: true
