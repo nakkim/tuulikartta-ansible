@@ -1,0 +1,22 @@
+---
+# tasks file for tuulikartta-geoserver
+# Requires the postgres container and the tuulikartta docker network
+# (tuulikartta_server role, postgres/main.yml).
+
+- name: Check required geoserver variables
+  ansible.builtin.assert:
+    that:
+      - geoserver_admin_user is defined
+      - geoserver_admin_password is defined
+      - geoserver_db_password is defined
+      - "'CHANGE_ME' not in [geoserver_admin_user, geoserver_admin_password | string, geoserver_db_password | string]"
+    fail_msg: "Set geoserver_admin_user, geoserver_admin_password and geoserver_db_password in group_vars/tuulikartta_main_server.yml"
+
+- name: Set up geoserver database
+  include_tasks: database.yml
+
+- name: Get source and prepare directories
+  include_tasks: source.yml
+
+- name: Run geoserver containers
+  include_tasks: containers.yml

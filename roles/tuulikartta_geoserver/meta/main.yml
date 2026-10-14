@@ -1,0 +1,8 @@
+galaxy_info:
+  author: Ville Oravilkka
+  description: Deploy tuulikartta-geoserver (radar dBZ WMS/WMTS) using the shared postgres container
+  license: MIT
+  min_ansible_version: "2.10"
+  galaxy_tags: []
+
+dependencies: []

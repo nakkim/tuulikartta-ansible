@@ -1,2 +1,13 @@
 ---
 # defaults file for tuulikartta-server
+
+# Host nginx: receives HTTP from the Hetzner load balancer (TLS ends there)
+nginx_server_names:
+  - tuulikartta.info
+  - www.tuulikartta.info
+
+# Addresses allowed to set the client IP with X-Forwarded-For (the load balancer)
+nginx_trusted_proxies: []
+
+# host:port of the GeoServer WMS/WMTS proxy. When set, /geoserver/ is routed there.
+# nginx_geoserver_upstream: "127.0.0.1:8088"

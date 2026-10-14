@@ -1,0 +1,44 @@
+---
+- name: Install git
+  ansible.builtin.dnf:
+    name: git
+    state: present
+
+- name: Check out tuulikartta-geoserver
+  ansible.builtin.git:
+    repo: "{{ geoserver_repo }}"
+    dest: "{{ geoserver_src_dir }}"
+    version: "{{ geoserver_repo_version }}"
+    force: true
+  register: geoserver_src
+
+- name: Create geoserver data dir
+  ansible.builtin.file:
+    path: "{{ geoserver_data_dir }}"
+    state: directory
+    mode: '0755'
+
+# GeoServer (uid geoserver_uid) creates the mosaic config and sample image here.
+# radar-poller runs as root and writes the GeoTIFFs.
+- name: Create geoserver mosaic dir
+  ansible.builtin.file:
+    path: "{{ geoserver_mosaic_dir }}"
+    state: directory
+    owner: "{{ geoserver_uid }}"
+    group: "{{ geoserver_gid }}"
+    mode: '0775'
+  register: geoserver_mosaic_dir_result
+
+# Seed only on first deploy: GeoServer writes its own state (security,
+# catalog changes) into the data dir, so an existing one is left alone.
+- name: Check if geoserver data dir is initialized
+  ansible.builtin.stat:
+    path: "{{ geoserver_data_dir }}/global.xml"
+  register: geoserver_data_initialized
+
+- name: Seed geoserver data dir from source
+  ansible.builtin.copy:
+    src: "{{ geoserver_src_dir }}/geoserver_data/"
+    dest: "{{ geoserver_data_dir }}/"
+    remote_src: true
+  when: not geoserver_data_initialized.stat.exists

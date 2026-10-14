@@ -13,6 +13,9 @@
 - name: Docker operations
   include_tasks: docker/main.yml
 
+- name: Nginx setup
+  include_tasks: nginx/main.yml
+
 - name: cronjobs setup
   include_tasks: cron/main.yml
 

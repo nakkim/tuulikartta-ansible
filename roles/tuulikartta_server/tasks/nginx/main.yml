@@ -1,0 +1,39 @@
+---
+# Replaces the old certbot bootstrap config in the same file
+- name: Deploy and validate nginx site config
+  block:
+    - name: Deploy nginx site config
+      ansible.builtin.template:
+        src: nginx-tuulikartta-lb.conf.j2
+        dest: /etc/nginx/conf.d/tuulikartta.conf
+        mode: '0644'
+        backup: true
+      register: nginx_site
+
+    - name: Validate nginx config
+      ansible.builtin.command: nginx -t
+      changed_when: false
+      when: nginx_site.changed
+  rescue:
+    - name: Restore previous nginx site config
+      ansible.builtin.copy:
+        src: "{{ nginx_site.backup_file }}"
+        dest: /etc/nginx/conf.d/tuulikartta.conf
+        remote_src: true
+      when: nginx_site.backup_file is defined
+
+    - name: Fail after restoring nginx config
+      ansible.builtin.fail:
+        msg: "New nginx config was invalid and has been reverted, see nginx -t output above"
+
+- name: Enable and start nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+    enabled: true
+
+- name: Reload nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+  when: nginx_site.changed

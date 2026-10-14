@@ -7,6 +7,8 @@ tuulikartta_server:
   image: "ghcr.io/nakkim/tuulikartta.info"
   tag: "1.0.16"
 
+# PostGIS build of postgres 16: same data format as postgres:16-alpine,
+# plus the PostGIS extension needed by tuulikartta-geoserver
 postgres:
-  image: "docker.io/library/postgres"
-  tag: "16-alpine"
+  image: "docker.io/postgis/postgis"
+  tag: "16-3.5-alpine"

@@ -1,0 +1,20 @@
+---
+geoserver_images:
+  geoserver:
+    image: "docker.io/kartoza/geoserver"
+    tag: "2.28.3"
+  proxy:
+    image: "docker.io/library/nginx"
+    tag: "1.27-alpine"
+  radar_poller:
+    image: "ghcr.io/nakkim/tuulikartta-geoserver/radar-poller"
+    tag: "{{ geoserver_version }}"
+  geoserver_init:
+    image: "ghcr.io/nakkim/tuulikartta-geoserver/geoserver-init"
+    tag: "{{ geoserver_version }}"
+
+# Layer settings shared by radar-poller and geoserver-init
+geoserver_workspace: radar
+geoserver_store: finland_dbz_eureffin
+geoserver_coverage: radar_finland_eureffin
+geoserver_mosaic_name: finland_dbz_eureffin

@@ -14,3 +14,7 @@
       ansible.builtin.include_role:
         name: tuulikartta_server
         tasks_from: postgres/main.yml
+
+    - name: Install geoserver
+      ansible.builtin.include_role:
+        name: tuulikartta_geoserver

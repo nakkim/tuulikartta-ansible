@@ -118,6 +118,18 @@ ansible-playbook \
   tuulikartta-server.yml
 ```
 
+## GeoServer (main server)
+
+The `tuulikartta_geoserver` role deploys [tuulikartta-geoserver](https://github.com/nakkim/tuulikartta-geoserver) on the main server: `geoserver`, `radar-poller`, `geoserver-proxy` and a one-shot `geoserver-init` container, all on the `tuulikartta` docker network.
+
+- The granule index uses the shared `postgres` container (PostGIS image), in its own `radar` database owned by the `radar` user.
+- The radar-poller and geoserver-init images come from ghcr.io, pinned to `geoserver_version`. The role also checks out the repo to `/opt/tuulikartta-geoserver` at `geoserver_repo_version`, for `proxy/nginx.conf` and the initial GeoServer data dir.
+- `/data/geoserver/data_dir` is seeded from the repo on first deploy only. After that, GeoServer owns it.
+- GeoServer admin (web UI, REST): `127.0.0.1:8081`, reach it with `ssh -L 8081:127.0.0.1:8081 <server>`.
+- WMS/WMTS proxy: `127.0.0.1:8088`. Host nginx routes `https://tuulikartta.info/geoserver/` there (TLS ends at the Hetzner load balancer), e.g. `https://tuulikartta.info/geoserver/wms?service=WMS&version=1.3.0&request=GetCapabilities`.
+
+Set `geoserver_admin_user`, `geoserver_admin_password` and `geoserver_db_password` in `group_vars/tuulikartta_main_server.yml` (encrypt the passwords with vault). Other settings are in `roles/tuulikartta_geoserver/defaults/main.yml`.
+
 ## Managing Notifications
 
 `notifications.yml` inserts rows into the app's `notifications` table on the main server. Copy `notification-data/data.yml`, edit the rows, then run:
@@ -148,6 +160,11 @@ To remove all rows, add `-e notifications_clear=true`. The playbook asks for con
 │   └── production/
 │       └── hosts.yml                   # main and aux servers
 └── roles/
+    ├── tuulikartta_geoserver/          # GeoServer, radar poller and WMS/WMTS proxy (main server only)
+    │   ├── defaults/main.yml           # repo version, paths, ports, database name
+    │   ├── meta/main.yml
+    │   ├── tasks/                      # main, database, source (checkout + directories), containers
+    │   └── vars/main.yml               # image names and tags, layer names
     └── tuulikartta_server/
         ├── defaults/
         │   └── main.yml                # (empty — all config lives in vars/)

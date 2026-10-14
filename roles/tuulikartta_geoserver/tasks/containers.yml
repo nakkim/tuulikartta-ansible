@@ -1,0 +1,152 @@
+---
+- name: Run geoserver container
+  community.docker.docker_container:
+    name: geoserver
+    image: "{{ geoserver_images.geoserver.image }}:{{ geoserver_images.geoserver.tag }}"
+    state: started
+    pull: true
+    restart_policy: unless-stopped
+    env:
+      GEOSERVER_ADMIN_USER: "{{ geoserver_admin_user }}"
+      GEOSERVER_ADMIN_PASSWORD: "{{ geoserver_admin_password | string }}"
+      DISABLE_WEB_INTERFACE: "{{ geoserver_disable_web_interface | string | lower }}"
+      GEOSERVER_UID: "{{ geoserver_uid | string }}"
+      GEOSERVER_GID: "{{ geoserver_gid | string }}"
+    networks:
+      - name: tuulikartta
+    ports:
+      - "{{ geoserver_admin_bind }}:8080"
+    volumes:
+      - "{{ geoserver_data_dir }}:/opt/geoserver/data_dir"
+      - "{{ geoserver_mosaic_dir }}:/data/dbz/geotiff"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -u \"$GEOSERVER_ADMIN_USER:$GEOSERVER_ADMIN_PASSWORD\" http://localhost:8080/geoserver/rest/about/version.json || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    # Restart after fixing mosaic dir ownership so GeoServer reopens the mosaic store
+    restart: "{{ geoserver_mosaic_dir_result.changed }}"
+    detach: true
+  no_log: "{{ hide_secrets | default(true) }}"
+
+- name: Wait for geoserver to become healthy
+  community.docker.docker_container_info:
+    name: geoserver
+  register: geoserver_info
+  until: geoserver_info.container.State.Health.Status | default('') == 'healthy'
+  retries: 60
+  delay: 5
+
+# Clients reach GeoServer through the load balancer and host nginx, so it
+# cannot work out its public URL from the request
+- name: Get geoserver global settings
+  ansible.builtin.uri:
+    url: "http://{{ geoserver_admin_bind }}/geoserver/rest/settings.json"
+    user: "{{ geoserver_admin_user }}"
+    password: "{{ geoserver_admin_password | string }}"
+    force_basic_auth: true
+  register: geoserver_settings
+  when: geoserver_proxy_base_url | length > 0
+  no_log: "{{ hide_secrets | default(true) }}"
+
+- name: Set geoserver proxy base URL
+  ansible.builtin.uri:
+    url: "http://{{ geoserver_admin_bind }}/geoserver/rest/settings"
+    method: PUT
+    user: "{{ geoserver_admin_user }}"
+    password: "{{ geoserver_admin_password | string }}"
+    force_basic_auth: true
+    body_format: json
+    body: "{{ geoserver_settings.json | combine({'global': {'settings': {'proxyBaseUrl': geoserver_proxy_base_url}}}, recursive=true) }}"
+  when:
+    - geoserver_proxy_base_url | length > 0
+    - geoserver_settings.json.global.settings.proxyBaseUrl | default('') != geoserver_proxy_base_url
+  changed_when: true
+  no_log: "{{ hide_secrets | default(true) }}"
+
+- name: Run radar-poller container
+  community.docker.docker_container:
+    name: radar-poller
+    image: "{{ geoserver_images.radar_poller.image }}:{{ geoserver_images.radar_poller.tag }}"
+    state: started
+    pull: true
+    restart_policy: unless-stopped
+    env:
+      POLL_INTERVAL_SECONDS: "{{ radar_poll_interval_seconds | string }}"
+      OUTPUT_DIR: /data/dbz/geotiff
+      RETENTION_HOURS: "{{ radar_retention_hours | string }}"
+      GEOSERVER_HARVEST_ENABLED: "true"
+      GEOSERVER_URL: http://geoserver:8080/geoserver
+      GEOSERVER_WORKSPACE: "{{ geoserver_workspace }}"
+      GEOSERVER_STORE: "{{ geoserver_store }}"
+      GEOSERVER_COVERAGE: "{{ geoserver_coverage }}"
+      MOSAIC_NAME: "{{ geoserver_mosaic_name }}"
+      GEOSERVER_USER: "{{ geoserver_admin_user }}"
+      GEOSERVER_PASSWORD: "{{ geoserver_admin_password | string }}"
+      POSTGIS_HOST: postgres
+      POSTGIS_PORT: "5432"
+      POSTGIS_DB: "{{ geoserver_db_name }}"
+      POSTGIS_USER: "{{ geoserver_db_user }}"
+      POSTGIS_PASSWORD: "{{ geoserver_db_password | string }}"
+    networks:
+      - name: tuulikartta
+    volumes:
+      - "{{ geoserver_mosaic_dir }}:/data/dbz/geotiff"
+    detach: true
+  no_log: "{{ hide_secrets | default(true) }}"
+
+- name: Run geoserver proxy container
+  community.docker.docker_container:
+    name: geoserver-proxy
+    image: "{{ geoserver_images.proxy.image }}:{{ geoserver_images.proxy.tag }}"
+    state: started
+    pull: true
+    restart_policy: unless-stopped
+    networks:
+      - name: tuulikartta
+    ports:
+      - "{{ geoserver_proxy_bind }}:80"
+    volumes:
+      - "{{ geoserver_src_dir }}/proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro"
+    # The mounted nginx.conf comes from the checkout. Restart to load a new version.
+    restart: "{{ geoserver_src.changed }}"
+    detach: true
+
+# One-shot, idempotent setup: workspace, store, layer, time dimension, WMS limits.
+# Waits until radar-poller has downloaded the first image.
+- name: Configure geoserver layer
+  community.docker.docker_container:
+    name: geoserver-init
+    image: "{{ geoserver_images.geoserver_init.image }}:{{ geoserver_images.geoserver_init.tag }}"
+    state: started
+    pull: true
+    recreate: true
+    detach: false
+    cleanup: true
+    env:
+      GEOSERVER_URL: http://geoserver:8080/geoserver
+      GEOSERVER_USER: "{{ geoserver_admin_user }}"
+      GEOSERVER_PASSWORD: "{{ geoserver_admin_password | string }}"
+      GEOSERVER_WORKSPACE: "{{ geoserver_workspace }}"
+      GEOSERVER_STORE: "{{ geoserver_store }}"
+      GEOSERVER_COVERAGE: "{{ geoserver_coverage }}"
+      MOSAIC_NAME: "{{ geoserver_mosaic_name }}"
+      MOSAIC_DIR: /data/dbz/geotiff
+    networks:
+      - name: tuulikartta
+    volumes:
+      - "{{ geoserver_mosaic_dir }}:/data/dbz/geotiff:ro"
+  register: geoserver_init
+  changed_when: "'Creating' in (geoserver_init.container.Output | default(''))"
+  failed_when: false
+  no_log: "{{ hide_secrets | default(true) }}"
+
+- name: Show geoserver setup output
+  ansible.builtin.debug:
+    msg: "{{ (geoserver_init.container.Output | default('')).splitlines() }}"
+
+- name: Fail if geoserver setup failed
+  ansible.builtin.fail:
+    msg: "geoserver-init failed (exit code {{ geoserver_init.status | default('unknown') }}), see output above"
+  when: geoserver_init.status | default(1) != 0

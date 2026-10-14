@@ -1,0 +1,7 @@
+---
+# Hetzner load balancer: public IPv4/IPv6, and the private network range in
+# case the targets are reached over a private network
+nginx_trusted_proxies:
+  - 77.42.9.35
+  - 2a01:4f9:c01d:1b9c::1
+  - 10.0.0.0/8

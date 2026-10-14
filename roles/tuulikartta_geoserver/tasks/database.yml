@@ -1,0 +1,40 @@
+---
+# Separate database and user for the granule index, in the shared postgres
+# container. Values are passed as psql variables and quoted by psql.
+- name: Create geoserver database user and database
+  community.docker.docker_container_exec:
+    container: postgres
+    argv:
+      - psql
+      - -v
+      - ON_ERROR_STOP=1
+      - -U
+      - "{{ postgres_user }}"
+      - -d
+      - "{{ postgres_db }}"
+      - -v
+      - "db_user={{ geoserver_db_user }}"
+      - -v
+      - "db_password={{ geoserver_db_password | string }}"
+      - -v
+      - "db_name={{ geoserver_db_name }}"
+    stdin: |
+      SELECT format('CREATE ROLE %I LOGIN', :'db_user')
+      WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'db_user') \gexec
+      -- Keep the password in sync with group_vars
+      SELECT format('ALTER ROLE %I PASSWORD %L', :'db_user', :'db_password') \gexec
+      SELECT format('CREATE DATABASE %I OWNER %I', :'db_name', :'db_user')
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db_name') \gexec
+  register: geoserver_db
+  changed_when: "'CREATE ROLE' in geoserver_db.stdout or 'CREATE DATABASE' in geoserver_db.stdout"
+  no_log: "{{ hide_secrets | default(true) }}"
+
+- name: Enable PostGIS in geoserver database
+  community.docker.docker_container_exec:
+    container: postgres
+    argv: [psql, -v, ON_ERROR_STOP=1, -U, "{{ postgres_user }}", -d, "{{ geoserver_db_name }}"]
+    stdin: |
+      SELECT 'CREATE EXTENSION postgis'
+      WHERE NOT EXISTS (SELECT FROM pg_extension WHERE extname = 'postgis') \gexec
+  register: geoserver_postgis
+  changed_when: "'CREATE EXTENSION' in geoserver_postgis.stdout"
