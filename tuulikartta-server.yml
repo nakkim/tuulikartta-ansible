@@ -18,3 +18,19 @@
     - name: Install geoserver
       ansible.builtin.include_role:
         name: tuulikartta_geoserver
+
+# Runs last on every server: remove images no container uses (docker image prune -a).
+# Stopped containers keep their images, e.g. the tuulikartta-processor cron container.
+- hosts: tuulikartta_servers
+  gather_facts: false
+  tasks:
+    - name: Remove unused docker images
+      community.docker.docker_prune:
+        images: true
+        images_filters:
+          dangling: false
+      register: docker_prune_result
+
+    - name: Show reclaimed space
+      ansible.builtin.debug:
+        msg: "Removed {{ docker_prune_result.images | default([]) | length }} images, reclaimed {{ (docker_prune_result.images_space_reclaimed | default(0) / 1024 / 1024) | round(1) }} MB"

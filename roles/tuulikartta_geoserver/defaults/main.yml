@@ -1,12 +1,12 @@
 ---
 # Release of tuulikartta-geoserver (the repo's VERSION file). Selects the
 # radar-poller and geoserver-init images published to ghcr.io by its CI.
-geoserver_version: "1.0.0"
+geoserver_version: "1.0.3"
 
 # The repo checkout is still needed for proxy/nginx.conf and the initial
 # GeoServer data dir. Pin the commit the images above were built from.
 geoserver_repo: "https://github.com/nakkim/tuulikartta-geoserver.git"
-geoserver_repo_version: "d0224908715905ec1e473e70ec697d0adeb04163"
+geoserver_repo_version: "a6e19303e6cf7c3a9e0df246da2c27a55d8fbb69"
 
 geoserver_src_dir: /opt/tuulikartta-geoserver
 # GeoServer data dir. Seeded from the repo's geoserver_data/ on first deploy,
@@ -34,4 +34,4 @@ geoserver_db_name: radar
 geoserver_db_user: radar
 
 radar_poll_interval_seconds: 10
-radar_retention_hours: 1
+radar_retention_hours: 100
